@@ -1,92 +1,137 @@
-resource "yandex_storage_bucket" "test_bucket" {
-  bucket = var.s3_bucket_name
-  folder_id = var.folder_id
-  anonymous_access_flags {
-    read = var.s3_anon_read
-    list = var.s3_anon_list
-  }
-}
-
-resource "yandex_storage_object" "image_file" {
-  depends_on = [yandex_storage_bucket.test_bucket]
-  bucket = var.s3_bucket_name
-  key    = var.s3_file_key
-  source = var.s3_file_path
-
-}
 
 resource "yandex_vpc_network" "netology" {
   name = var.vpc_name
 }
-resource "yandex_vpc_subnet" "netology" {
-  name           = var.vpc_name
+# Public subnet
+resource "yandex_vpc_subnet" "public" {
+  name           = var.pub_name
   zone           = var.default_zone
   network_id     = yandex_vpc_network.netology.id
-  v4_cidr_blocks = var.default_cidr
+  v4_cidr_blocks = var.pub_cidr
+
+}
+# Private subnet
+resource "yandex_vpc_subnet" "private" {
+  name           = var.pvt_name
+  zone           = var.default_zone
+  network_id     = yandex_vpc_network.netology.id
+  v4_cidr_blocks = var.pvt_cidr
+  route_table_id = yandex_vpc_route_table.netology-rt.id
 }
 
-resource "yandex_compute_instance_group" "web-servers" {
-  name = var.instance_group_options.name
-  service_account_id = var.instance_group_options.sa_id
+# Routing table
+resource "yandex_vpc_route_table" "netology-rt" {
+  name       = var.rt_name
+  network_id = yandex_vpc_network.netology.id
+  static_route {
+    destination_prefix = var.rt_prefix
+    next_hop_address   = var.rt_gateway
+  }
+}
 
-  allocation_policy {
-    zones = var.instance_group_options.allocation_zones
-  }
-  scale_policy {
-    fixed_scale {
-      size = var.instance_group_options.scale_size
-    }
-  }
-  deploy_policy {
-    max_expansion   = var.instance_group_options.max_expansion
-    max_unavailable = var.instance_group_options.max_unavailable
-  }
-  instance_template {
-    name = var.instance_template_options.instance_name
-    hostname = var.instance_template_options.instance_hostname
-    platform_id = var.instance_template_options.platform
+# NAT instance
+resource "yandex_compute_instance" "nat-vm" {
+  name = var.nat_vm_options.instance_name
+
+    hostname = var.nat_vm_options.instance_name
+    platform_id = var.common_vm_options.platform
     boot_disk {
 
       initialize_params {
-        image_id = var.instance_template_options.image_id
-        size = var.instance_template_options.boot_disk_size
+        image_id = var.nat_vm_options.image_id
+        size = var.common_vm_options.boot_disk_size
       }
     }
 
     resources {
-      cores  = var.instance_template_options.cores
-      memory = var.instance_template_options.memory
-      core_fraction = var.instance_template_options.cores_fraction
+      cores  = var.common_vm_options.cores
+      memory = var.common_vm_options.memory
+      core_fraction = var.common_vm_options.cores_fraction
     }
 
     scheduling_policy {
-      preemptible = var.instance_template_options.preemptible
+      preemptible = var.common_vm_options.preemptible
     }
 
     network_interface {
-      subnet_ids = [yandex_vpc_subnet.netology.id]
-      nat       = var.instance_template_options.net_nat
+      subnet_id = yandex_vpc_subnet.public.id
+      ip_address = var.rt_gateway
+      nat       = var.nat_vm_options.net_nat
     }
 
     metadata = {
       user-data          = data.template_file.cloudinit.rendered
-      serial-port-enable = var.instance_template_options.meta_serial-port-enable
+      serial-port-enable = var.common_vm_options.meta_serial-port-enable
     }
-  }
-  health_check {
-    healthy_threshold = var.ig_healthcheck_options.healthy_threshold
-    unhealthy_threshold = var.ig_healthcheck_options.unhealthy_threshold
-    interval = var.ig_healthcheck_options.interval
-    timeout = var.ig_healthcheck_options.timeout
-    http_options {
-      path = var.ig_healthcheck_options.http_path
-      port = var.ig_healthcheck_options.http_port
-    }
-  }
+}
 
-  load_balancer {
-    target_group_name = var.instance_group_options.lb_target_group_name
-  }
+resource "yandex_compute_instance" "public-vm" {
+  name = var.pub_vm_options.instance_name
+
+    hostname = var.pub_vm_options.instance_name
+    platform_id = var.common_vm_options.platform
+    boot_disk {
+
+      initialize_params {
+        image_id = var.common_vm_options.image_id
+        size = var.common_vm_options.boot_disk_size
+      }
+    }
+
+    resources {
+      cores  = var.common_vm_options.cores
+      memory = var.common_vm_options.memory
+      core_fraction = var.common_vm_options.cores_fraction
+    }
+
+    scheduling_policy {
+      preemptible = var.common_vm_options.preemptible
+    }
+
+    network_interface {
+      subnet_id = yandex_vpc_subnet.public.id
+      nat       = var.pub_vm_options.net_nat
+    }
+
+    metadata = {
+      user-data          = data.template_file.cloudinit.rendered
+      serial-port-enable = var.common_vm_options.meta_serial-port-enable
+    }
+
+}
+
+resource "yandex_compute_instance" "private-vm" {
+  name = var.pvt_vm_options.instance_name
+
+    hostname = var.pvt_vm_options.instance_name
+    platform_id = var.common_vm_options.platform
+    boot_disk {
+
+      initialize_params {
+        image_id = var.common_vm_options.image_id
+        size = var.common_vm_options.boot_disk_size
+      }
+    }
+
+    resources {
+      cores  = var.common_vm_options.cores
+      memory = var.common_vm_options.memory
+      core_fraction = var.common_vm_options.cores_fraction
+    }
+
+    scheduling_policy {
+      preemptible = var.common_vm_options.preemptible
+    }
+
+    network_interface {
+      subnet_id = yandex_vpc_subnet.private.id
+      nat       = var.pvt_vm_options.net_nat
+    }
+
+    metadata = {
+      user-data          = data.template_file.cloudinit.rendered
+      serial-port-enable = var.common_vm_options.meta_serial-port-enable
+    }
 
 }
 
@@ -95,32 +140,17 @@ data "template_file" "cloudinit" {
   vars = {
     username        = var.vms_ssh_user
     ssh_public_key  = local.vms_ssh_root_key
-    s3_bucket_name  = var.s3_bucket_name
-    s3_file_key     = var.s3_file_key
+
   }
 }
 
-resource "yandex_lb_network_load_balancer" "web-server-nlb" {
-  name = var.nlb_options.name
-  type = "external"
-  listener {
-    name = "public-service"
-    port = var.nlb_options.external_port
-
-    external_address_spec {
-      ip_version = "ipv4"
-    }
-  }
-
-  attached_target_group {
-    target_group_id = yandex_compute_instance_group.web-servers.load_balancer.0.target_group_id
-
-    healthcheck {
-      name = "internal-app-port"
-      http_options {
-        port = var.nlb_options.hc_port
-        path = var.nlb_options.hc_path
-      }
-    }
-  }
+# Output
+output "nat_vm_external_ip" {
+  value = yandex_compute_instance.nat-vm.network_interface.0.nat_ip_address
+}
+output "public_vm_external_ip" {
+  value = yandex_compute_instance.public-vm.network_interface.0.nat_ip_address
+}
+output "private_vm_ip" {
+  value = yandex_compute_instance.private-vm.network_interface.0.ip_address
 }

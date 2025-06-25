@@ -19,17 +19,57 @@ variable "default_zone" {
   default     = "ru-central1-a"
   description = "https://cloud.yandex.ru/docs/overview/concepts/geo-scope"
 }
-variable "default_cidr" {
-  type        = list(string)
-  default     = ["10.0.1.0/24"]
-  description = "https://cloud.yandex.ru/docs/vpc/operations/subnet-create"
-}
+
+### networks
 
 variable "vpc_name" {
   type        = string
   default     = "netology"
   description = "VPC network&subnet name"
 }
+
+variable "pvt_cidr" {
+  type        = list(string)
+  default     = ["192.168.20.0/24"]
+  description = "private subnet address"
+}
+
+variable "pvt_name" {
+  type        = string
+  default     = "private"
+  description = "private subnet name"
+}
+
+variable "pub_cidr" {
+  type        = list(string)
+  default     = ["192.168.10.0/24"]
+  description = "public subnet address"
+}
+
+variable "pub_name" {
+  type        = string
+  default     = "public"
+  description = "public subnet name"
+}
+
+variable "rt_name" {
+  type        = string
+  default     = "netology-rt"
+  description = "default route name"
+}
+
+variable "rt_prefix" {
+  type        = string
+  default     = "0.0.0.0/0"
+  description = "default route prefix"
+}
+
+variable "rt_gateway" {
+  type        = string
+  default     = "192.168.10.254"
+  description = "default route prefix"
+}
+
 
 ###common vars
 
@@ -47,123 +87,75 @@ variable "vms_ssh_user" {
 
 ###compute vars
 
-variable "instance_template_options" {
+variable "common_vm_options" {
   type = object({
-    preemptible = bool
-    net_nat = bool
-    platform = string
+    preemptible             = bool
+    net_nat                 = bool
+    platform                = string
     meta_serial-port-enable = number
-
-    boot_disk_size = number
-    instance_name  = string
-    instance_hostname  = string
-    image_id   = string
-    cores = number
-    cores_fraction = number
-    memory = number
+    boot_disk_size          = number
+    instance_name           = string
+    instance_hostname       = string
+    image_id                = string
+    cores                   = number
+    cores_fraction          = number
+    memory                  = number
   })
   default = {
-    preemptible = true
-    platform       = "standard-v1"
-
-    instance_name  = "web-{instance.index}"
+    preemptible             = true
+    platform                = "standard-v1"
+    instance_name           = "web-{instance.index}"
     instance_hostname       = "web-{instance.index}"
-
-    boot_disk_size = 10
-    image_id   = "fd827b91d99psvq5fjit"
-    net_nat      = true
+    boot_disk_size          = 10
+    image_id                = "fd827b91d99psvq5fjit" #LAMP Ubuntu
+    net_nat                 = true
     meta_serial-port-enable = 1
-    cores = 2
-    cores_fraction = 5
-    memory = 1
+    cores                   = 2
+    cores_fraction          = 5
+    memory                  = 1
   }
   description = "VM Template Parameters"
 }
 
-variable "instance_group_options" {
+variable "nat_vm_options" {
   type = object({
-    name               = string
-    sa_id              = string
-    allocation_zones   = list(string)
-    max_expansion      = number
-    max_unavailable    = number
-    scale_size         = number
-    lb_target_group_name = string
+    instance_name   = string
+    image_id        = string
+    net_nat         = bool
   })
   default = {
-    name               = "web-servers"
-    sa_id            = "ajeco4sgj5tkch9j8q4n"
-    allocation_zones   = ["ru-central1-a"]
-    max_expansion      = 2
-    max_unavailable    = 2
-    scale_size         = 3
-    lb_target_group_name = "web-nlb-tg"
-  }
-  description = "Instance group options"
-}
+    instance_name   = "nat-vm"
+    image_id        = "fd80mrhj8fl2oe87o4e1" #Nat instance Ubuntu
+    net_nat         = true
 
-variable "ig_healthcheck_options" {
-  type = object({
-    healthy_threshold = number
-    unhealthy_threshold = number
-    interval = number
-    timeout = number
-    http_path = string
-    http_port = number
-  })
-  default = {
-    healthy_threshold = 2
-    unhealthy_threshold = 2
-    interval = 2
-    timeout = 1
-    http_path = "/"
-    http_port = 80
   }
-  description = "Instance group healthcheck params"
+  description = "NAT VM options"
 }
 
 
-variable "nlb_options" {
+variable "pub_vm_options" {
   type = object({
-    hc_port = number
-    hc_path = string
-    external_port = number
-    name = string
+    instance_name   = string
+    net_nat         = bool
+  })
+  default = {
+    instance_name   = "public-vm"
+    net_nat         = true
+  }
+  description = "public VM options"
+}
+
+variable "pvt_vm_options" {
+  type = object({
+    instance_name   = string
+    net_nat         = bool
 
   })
   default = {
-    name = "web-server-nlb"
-    hc_port = 80
-    hc_path = "/"
-    external_port = 80
+    instance_name   = "private-vm"
+    net_nat         = false
   }
-  description = "LOad balancer options"
+  description = "private VM options"
 }
 
 
-###storage vars
-
-variable "s3_bucket_name" {
-  type        = string
-  default     = "alexsys-test-bucket"
-  description = "bucket name to create"
-}
-variable "s3_anon_read" {
-  type = bool
-  default = true
-}
-
-variable "s3_anon_list" {
-  type = bool
-  default = true
-}
-
-variable "s3_file_key" {
-  type        = string
-  default     = "theimage.jpg"
-}
-
-variable "s3_file_path" {
-  type        = string
-  default     = "res/the_cat.jpg"
-}

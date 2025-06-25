@@ -7,21 +7,3 @@ users:
     ssh_authorized_keys:
       - ${ssh_public_key}
 
-write_files:
-  - path: /var/www/html/index.html
-    content: |
-      <html>
-      <body>
-        <h1>Hello, World!</h1>
-        <p>This is the test blah blah.</p>
-        <p>and this is the great image:</p>
-        <img src=https://storage.yandexcloud.net/${s3_bucket_name}/${s3_file_key}></img>
-        <p>Instance: #hostname# IP:#public_ip#</p>
-      </body>
-      </html>
-    owner: 'root:root'
-    permissions: '0644'
-
-runcmd:
-  - 'sed -i "s/#hostname#/$(hostname)/g" /var/www/html/index.html'
-  - 'sed -i "s/#public_ip#/$(curl ifconfig.me)/g" /var/www/html/index.html'
