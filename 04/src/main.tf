@@ -48,4 +48,4 @@
 # Output
 #output "nat_vm_external_ip" {
 #  value = yandex_compute_instance.nat-vm.network_interface.0.nat_ip_address
-}
+#}
